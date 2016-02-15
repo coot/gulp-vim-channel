@@ -1,0 +1,17 @@
+{
+  "name": "gulp-server",
+  "version": "1.0.0",
+  "description": "gulp server which can run gulp commands",
+  "main": "scripts/gulp-server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Marcin Szamotulski <coot@riseup.net>",
+  "license": "ISC",
+  "dependencies": {
+    "argv": "0.0.2",
+    "byline": "^4.2.1",
+    "gulp": "^3.9.1",
+    "uncolor": "^0.4.0"
+  }
+}
