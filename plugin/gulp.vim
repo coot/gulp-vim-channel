@@ -60,7 +60,7 @@ fun! Gulp(bang, task)
     echoerr "gulpfile not found"
     return
   endif
-  let data = {'task': a:task, 'gulpfile': gulpfile, 'silent': a:bang == "!" ? v:true : v:false}
+  let data = {'task': a:task, 'gulpfile': fnamemodify(gulpfile, ':p'), 'silent': a:bang == "!" ? v:true : v:false}
   call ch_sendexpr(s:gulp_handle, data)
 endfun
 
