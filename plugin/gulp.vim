@@ -15,10 +15,15 @@ call ch_logfile('/tmp/ch.log')
 
 fun! GulpHandler(handle, msg)
   let data = a:msg['data']
-  elseif (a:msg['type'] != 'error' && data =~? '\v^\[[0-9:]+\] working directory changed to')
+  if (a:msg['type'] != 'err' && a:msg['type'] != 'task_err' && data =~? '\v^\[[0-9:]+\] working directory changed to')
     return
   endif
-  echomsg 'gulp: ' . substitute(data, '\_s\+$', '', '')
+
+  if mode() != "c"
+    echomsg 'gulp: ' . substitute(data, '\_s\+$', '', '')
+  else
+    silent echomsg 'gulp: ' . substitute(data, '\_s\+$', '', '')
+  endif
 endfun
 
 fun! StartGulpServer()
@@ -27,12 +32,8 @@ fun! StartGulpServer()
     let s:gulp_job = job_start(cmd)
   endif
   " echomsg job_status(s:gulp_job)
-  sleep 100m
+  sleep 200m  " 100m is ok, but we can wait longer
   let s:gulp_handle = ch_open('localhost:3746', {'callback': 'GulpHandler', 'timeout': 500})
-
-  " DEBUG
-  let g:gulp_job = s:gulp_job
-  let g:gulp_handle = s:gulp_handle
 endfun
 
 fun! StopGulpServer()
@@ -58,7 +59,7 @@ fun! Gulp(bang, task)
     echoerr "gulpfile not found"
     return
   endif
-  let data = {'task': a:task, 'gulpfile': fnamemodify(gulpfile, ':p')}
+  let data = {'type': 'start-task', 'task': a:task, 'gulpfile': fnamemodify(gulpfile, ':p')}
   call ch_sendexpr(s:gulp_handle, data)
 endfun
 
@@ -74,4 +75,13 @@ augroup GulpAutoDetect
   au VimLeave * call StopGulpServer()
 augroup END
 
-com! -bang -nargs=1 Gulp :call Gulp(<q-bang>, <q-args>)
+fun! ListGulpTasks(ArgLead, CmdLine, CursorPos)
+  let gulpfile = findfile('gulpfile.js', expand('%:p:h') . ';/')
+  if empty(gulpfile)
+    return ""
+  endif
+  let data = ch_sendexpr(s:gulp_handle, {'type': 'list-tasks', 'args': 'all', 'gulpfile': fnamemodify(gulpfile, ':p')})
+  return join(data["tasks"], "\n")
+endfun
+
+com! -bang -nargs=1 -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)

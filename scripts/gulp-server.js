@@ -88,7 +88,7 @@ function logEvents(socket, data, gulpInst) {
       0,
       {
         silent: false,
-        type: 'err',
+        type: 'task_err',
         data: '\'' + e.task + '\' error after ' + prettyTime(e.hrDuration),
       }
     ]));
@@ -98,7 +98,7 @@ function logEvents(socket, data, gulpInst) {
       0,
       {
         silent: false,
-        type: 'stdout',
+        type: 'task_start',
         data: 'Starting \'' + e.task + '\'...',
       }
     ]));
@@ -108,7 +108,7 @@ function logEvents(socket, data, gulpInst) {
       0,
       {
         silent: false,
-        type: 'stdout',
+        type: 'task_stop',
         data: 'Finished \'' + e.task + '\' after ' + prettyTime(e.hrDuration),
       }
     ]));
@@ -128,8 +128,9 @@ function sniff(writable, callback) {
 const server = net.createServer((socket) => {
   // new connection
 
+  let beQuiet = false;
   function sniffio(string, enc, fd) {
-    if (typeof string !== 'string')
+    if (beQuiet || typeof string !== 'string')
       return;
     string.split(/\n/).forEach((chunk) => {
       if (chunk.trim())
@@ -164,7 +165,22 @@ const server = net.createServer((socket) => {
         logEvents(socket, data, gulpInst);
 
       // run the task
-      gulpInst.start(data.task);
+      if (data.type === 'start-task')
+        gulpInst.start(data.task);
+      else if (data.type === 'list-tasks') {
+        let tasks;
+        if (data.args === 'running')
+          tasks = Object.keys(gulpInst.tasks)
+            .filter((task) => Boolean(gulpInst.tasks[task].running));
+        else
+          tasks = Object.keys(gulpInst.tasks);
+        socket.write(JSON.stringify([
+          requestID, {type: 'list-tasks', tasks: tasks}
+        ]));
+        beQuiet = true;
+        console.log(tasks);
+        beQuiet = false;
+      }
     } catch (err) {
       handleException(socket, err);
     }
