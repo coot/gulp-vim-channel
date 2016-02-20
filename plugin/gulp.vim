@@ -15,18 +15,16 @@ call ch_logfile('/tmp/ch.log')
 
 fun! GulpHandler(handle, msg)
   let data = a:msg['data']
-  if a:msg['type'] == 'close'
-    return
   elseif (a:msg['type'] != 'error' && data =~? '\v^\[[0-9:]+\] working directory changed to')
     return
   endif
-  echomsg "gulp: " . data
+  echomsg 'gulp: ' . substitute(data, '\_s\+$', '', '')
 endfun
 
 fun! StartGulpServer()
   if !exists('s:gulp_job') || job_status(s:gulp_job) != 'run'
     let cmd = ['/bin/sh', '-c', 'node --harmony ' . split(globpath(&rtp, 'scripts/gulp-server.js'), "\n")[0] . (has('unix') ? ' > /tmp/gs.log 2>&1' : '')]
-    let s:gulp_job = job_start(cmd, {'killonexit': 1})
+    let s:gulp_job = job_start(cmd)
   endif
   " echomsg job_status(s:gulp_job)
   sleep 100m
@@ -60,7 +58,7 @@ fun! Gulp(bang, task)
     echoerr "gulpfile not found"
     return
   endif
-  let data = {'task': a:task, 'gulpfile': fnamemodify(gulpfile, ':p'), 'silent': a:bang == "!" ? v:true : v:false}
+  let data = {'task': a:task, 'gulpfile': fnamemodify(gulpfile, ':p')}
   call ch_sendexpr(s:gulp_handle, data)
 endfun
 

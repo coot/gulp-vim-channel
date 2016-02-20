@@ -16,7 +16,17 @@ const uncolor = require('uncolor');
 const vm = require('vm');
 const path = require('path');
 
-const gulpMsg = /^\[[0-9:]+\] (Starting|Finished) /
+// some task may use process.exit to exit (gulp-karma)
+process.exit = () => {};
+
+function genPaths(list, dir) {
+  list.push(path.join(dir, 'node_modules'));
+  let parentDir = path.parse(dir).dir;
+  if (dir != parentDir)
+    return genPaths(list, parentDir);
+  else
+    return list;
+}
 
 /*
  * Configures gulp with a given gulpfile.
@@ -34,17 +44,7 @@ const gulpMsg = /^\[[0-9:]+\] (Starting|Finished) /
  *
  * @returns gulp instance
  */
-function genPaths(list, dir) {
-  list.push(path.join(dir, 'node_modules'));
-  let parentDir = path.parse(dir).dir;
-  if (dir != parentDir)
-    return genPaths(list, parentDir);
-  else
-    return list;
-}
-
 function getGulp(gulpfile) {
-  console.log('getGulp', gulpfile);
   let cwd = process.cwd(),
     paths = module.paths,
     dirname = path.dirname(gulpfile);
@@ -72,14 +72,18 @@ function handleException(socket, err) {
   socket.end(JSON.stringify([0, {'data': err.toString(), 'type': 'error', 'silent': false}]));
 }
 
-function logEvents(socket, task, gulpInst) {
-  console.log('logEvents', task);
-  function errHandler(e) {
-    console.log(e);
-    removeListeners();
-  }
-  function taskErr(e) {
-    console.log(e);
+function logEvents(socket, data, gulpInst) {
+  gulpInst.on('err', (e) => {
+    socket.write(JSON.stringify([
+      0,
+      {
+        silent: false,
+        type: 'err',
+        data: e.message,
+      }
+    ]));
+  });
+  gulpInst.on('task_err', (e) => {
     socket.write(JSON.stringify([
       0,
       {
@@ -88,9 +92,8 @@ function logEvents(socket, task, gulpInst) {
         data: '\'' + e.task + '\' error after ' + prettyTime(e.hrDuration),
       }
     ]));
-  }
-  function taskStart(e) {
-    console.log(e);
+  });
+  gulpInst.on('task_start', (e) => {
     socket.write(JSON.stringify([
       0,
       {
@@ -99,9 +102,8 @@ function logEvents(socket, task, gulpInst) {
         data: 'Starting \'' + e.task + '\'...',
       }
     ]));
-  }
-  function taskStop(e) {
-    console.log('stop', e);
+  });
+  gulpInst.on('task_stop', (e) => {
     socket.write(JSON.stringify([
       0,
       {
@@ -110,28 +112,43 @@ function logEvents(socket, task, gulpInst) {
         data: 'Finished \'' + e.task + '\' after ' + prettyTime(e.hrDuration),
       }
     ]));
-    if (e.task == task)
-      removeListeners();
-  }
-  function removeListeners() {
-    console.log('removeListeners');
-    gulpInst.removeListener('err', errHandler);
-    gulpInst.removeListener('task_err', taskErr);
-    gulpInst.removeListener('task_start', taskStart);
-    gulpInst.removeListener('task_stop', taskStop);
-  }
-  gulpInst.on('err', errHandler);
-  gulpInst.on('task_err', taskErr);
-  gulpInst.on('task_start', taskStart);
-  gulpInst.on('task_stop', taskStop);
+  });
 }
 
+// sniff on a writeable stream
+function sniff(writable, callback) {
+  var write = writable.write;
+  writable.write = (string, encoding, fd) => {
+    write.apply(process.stdout, arguments);
+    callback(string, encoding, fd);
+  };
+  return () => {writable.write = write;};
+}
 
 const server = net.createServer((socket) => {
+  // new connection
+
+  function sniffio(string, enc, fd) {
+    if (typeof string !== 'string')
+      return;
+    string.split(/\n/).forEach((chunk) => {
+      if (chunk.trim())
+        socket.write(JSON.stringify([
+          0,
+          {
+            silent: false,
+            type: 'stdout',
+            data: uncolor(chunk),
+          }
+        ]));
+    });
+  };
+  sniff(process.stdout, sniffio);
+  sniff(process.stderr, sniffio);
+
   socket.on('data', (msg) => {
     try {
       let decoded = JSON.parse(msg.toString());
-      console.log('recieved:', decoded);
       let data = decoded[1],
           task = data.task,
           silent = Boolean(data.silent),
@@ -143,12 +160,10 @@ const server = net.createServer((socket) => {
         gulpCache.set(gulpfile, gulpInst);
       }
 
-      // register listeners
-      console.log('register listeners');
-      logEvents(socket, task, gulpInst);
+      if (gulpInst._eventsCount === 0)
+        logEvents(socket, data, gulpInst);
 
       // run the task
-      console.log('gulp start', data.task);
       gulpInst.start(data.task);
     } catch (err) {
       handleException(socket, err);
@@ -170,4 +185,7 @@ if (require.main === module) {
     });
 }
 
-module.exports = getGulp;
+module.exports = {
+  getGulp: getGulp,
+  logEvents: logEvents,
+};
