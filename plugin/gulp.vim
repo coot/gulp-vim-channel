@@ -32,8 +32,7 @@ fun! StartGulpServer()
     let s:gulp_job = job_start(cmd)
   endif
   " echomsg job_status(s:gulp_job)
-  sleep 200m  " 100m is ok, but we can wait longer
-  let s:gulp_handle = ch_open('localhost:3746', {'callback': 'GulpHandler', 'timeout': 500})
+  let s:gulp_handle = ch_open('localhost:3746', {'callback': 'GulpHandler', 'waittime': 200})
 endfun
 
 fun! StopGulpServer()
@@ -72,6 +71,7 @@ endfun
 augroup GulpAutoDetect
   au!
   au BufRead * call GulpAutoDetect()
+  au VimEnter * call GulpAutoDetect()
   au VimLeave * call StopGulpServer()
 augroup END
 
@@ -85,3 +85,4 @@ fun! ListGulpTasks(ArgLead, CmdLine, CursorPos)
 endfun
 
 com! -bang -nargs=1 -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)
+com! GulpStatus :echo s:gulp_job . " [channel: " . ch_status(s:gulp_handle) . "]"
