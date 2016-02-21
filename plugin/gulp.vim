@@ -61,7 +61,7 @@ fun! Gulp(bang, tasks)
     return
   endif
   let data = {'type': 'start-tasks', 'args': split(a:tasks, '[[:space:]]\+'), 'silent': !empty(a:bang), 'gulpfile': fnamemodify(gulpfile, ':p')}
-  call ch_sendexpr(s:gulp_handle, data)
+  call ch_sendexpr(s:gulp_handle, data, {"callback": "GulpHandler"})
 endfun
 
 fun! GulpAutoDetect()
