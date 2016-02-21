@@ -87,5 +87,5 @@ fun! ListGulpTasks(ArgLead, CmdLine, CursorPos)
 endfun
 
 com! -bang -nargs=+ -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)
-com! GulpStatus :echo s:gulp_job . " [channel: " . ch_status(s:gulp_handle) . "]"
+com! GulpStatus :echo exists("s:gulp_job") && exists("s:gulp_handle") ? s:gulp_job . " [channel: " . ch_status(s:gulp_handle) . "]" : "gulp server not running"
 com! -count=0 GulpLog :echo join(<count> == 0 ? s:lbuf : s:lbuf[-<count>:], "\n")
