@@ -12,17 +12,19 @@
 "   finished
 
 call ch_logfile('/tmp/ch.log')
+let s:lbuf = [] " log buffer
 
 fun! GulpHandler(handle, msg)
-  let data = a:msg['data']
-  if (a:msg['type'] != 'err' && a:msg['type'] != 'task_err' && data =~? '\v^\[[0-9:]+\] working directory changed to')
+  let data = substitute(a:msg['data'], '\_s\+$', '', '')
+  let type = a:msg['type']
+  if (type != 'err' && type != 'task_err' && data =~? '\v^\[[0-9:]+\] working directory changed to')
     return
   endif
+  let msg = 'gulp: ' . data
+  call add(s:lbuf, msg)
 
-  if mode() != "c"
-    echomsg 'gulp: ' . substitute(data, '\_s\+$', '', '')
-  else
-    silent echomsg 'gulp: ' . substitute(data, '\_s\+$', '', '')
+  if mode() != "c" && type != "stdout" && !a:msg["silent"]
+      echomsg msg
   endif
 endfun
 
@@ -86,3 +88,4 @@ endfun
 
 com! -bang -nargs=1 -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)
 com! GulpStatus :echo s:gulp_job . " [channel: " . ch_status(s:gulp_handle) . "]"
+com! -count=0 GulpLog :echo join(<count> == 0 ? s:lbuf : s:lbuf[-<count>:], "\n")
