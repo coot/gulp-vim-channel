@@ -1,12 +1,5 @@
 'use strict';
-/*
- * How to run gulp programatically and get logs.
- * https://github.com/gulpjs/gulp/issues/770
- *
- * But this is good when running a single gulpfile.  We might need to run
- * different ones, so we need some level of isolation.
- *
- */
+
 const argv = require('argv');
 const byline = require('byline');
 const net = require('net');

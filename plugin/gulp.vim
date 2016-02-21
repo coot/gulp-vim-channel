@@ -1,17 +1,6 @@
-" :Gulp {task} [gulpfile]
-"   run gulp and redirect the output to a file, track changes of this file
-"   open a socket (if not yet opened) and send status messages to it whenever
-"   the file changes
-"   connect vim to that socket with a callback which will show the messages.
-"
-"   This is useful for tasks which are watching some files.  Its nice to see
-"   in the terminal that a task has finished.
-"
-"   write it in node :)
-"   First version should just show that a task has started / or a task has
-"   finished
+" author: Marcin Szamotulski
+" email: coot[AT]riseup[DOT]net
 
-call ch_logfile('/tmp/ch.log')
 let s:lbuf = [] " log buffer
 
 fun! GulpHandler(handle, msg)
