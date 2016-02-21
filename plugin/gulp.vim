@@ -54,13 +54,13 @@ fun! StopGulpServer()
 endfun
 
 " let g:gulpfile = '/home/marcin/webdev/rubble-workflow/rubble-workflow/gulpfile.js'
-fun! Gulp(bang, task)
+fun! Gulp(bang, tasks)
   let gulpfile = findfile('gulpfile.js', expand('%:p:h') . ';/')
   if empty(gulpfile)
     echoerr "gulpfile not found"
     return
   endif
-  let data = {'type': 'start-task', 'task': a:task, 'gulpfile': fnamemodify(gulpfile, ':p')}
+  let data = {'type': 'start-tasks', 'args': split(a:tasks, '[[:space:]]\+'), 'silent': !empty(a:bang), 'gulpfile': fnamemodify(gulpfile, ':p')}
   call ch_sendexpr(s:gulp_handle, data)
 endfun
 
@@ -86,6 +86,6 @@ fun! ListGulpTasks(ArgLead, CmdLine, CursorPos)
   return join(data["tasks"], "\n")
 endfun
 
-com! -bang -nargs=1 -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)
+com! -bang -nargs=+ -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)
 com! GulpStatus :echo s:gulp_job . " [channel: " . ch_status(s:gulp_handle) . "]"
 com! -count=0 GulpLog :echo join(<count> == 0 ? s:lbuf : s:lbuf[-<count>:], "\n")
