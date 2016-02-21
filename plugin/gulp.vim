@@ -29,31 +29,30 @@ fun! GulpHandler(handle, msg)
 endfun
 
 fun! StartGulpServer()
-  if !exists('s:gulp_job') || job_status(s:gulp_job) != 'run'
+  if !exists('s:job') || job_status(s:job) != 'run'
     let cmd = ['/bin/sh', '-c', 'node --harmony ' . split(globpath(&rtp, 'scripts/gulp-server.js'), "\n")[0] . (has('unix') ? ' > /tmp/gs.log 2>&1' : '')]
-    let s:gulp_job = job_start(cmd)
+    let s:job = job_start(cmd)
+    call job_setoptions(s:job, {"stoponexit": 1})
   endif
-  " echomsg job_status(s:gulp_job)
-  let s:gulp_handle = ch_open('localhost:3746', {'callback': 'GulpHandler', 'waittime': 200})
+  let s:ch_handle = ch_open('localhost:3746', {'callback': 'GulpHandler', 'waittime': 200})
 endfun
 
 fun! StopGulpServer()
-  if exists('s:gulp_handle')
+  if exists('s:ch_handle')
     try
-      call ch_close(s:gulp_handle)
+      call ch_close(s:ch_handle)
     catch /E906/
     endtry
-    unlet s:gulp_handle
+    unlet s:ch_handle
   endif
-  if exists('s:gulp_job')
+  if exists('s:job')
     try
-      call job_stop(s:gulp_job)
+      call job_stop(s:job)
     endtry
-    unlet s:gulp_job
+    unlet s:job
   endif
 endfun
 
-" let g:gulpfile = '/home/marcin/webdev/rubble-workflow/rubble-workflow/gulpfile.js'
 fun! Gulp(bang, tasks)
   let gulpfile = findfile('gulpfile.js', expand('%:p:h') . ';/')
   if empty(gulpfile)
@@ -61,11 +60,11 @@ fun! Gulp(bang, tasks)
     return
   endif
   let data = {'type': 'start-tasks', 'args': split(a:tasks, '[[:space:]]\+'), 'silent': !empty(a:bang), 'gulpfile': fnamemodify(gulpfile, ':p')}
-  call ch_sendexpr(s:gulp_handle, data, {"callback": "GulpHandler"})
+  call ch_sendexpr(s:ch_handle, data, {"callback": 0})
 endfun
 
 fun! GulpAutoDetect()
-  if !exists('s:gulp_handle') && !empty(findfile('gulpfile.js', expand('%:p:h') . ';/'))
+  if !exists('s:ch_handle') && !empty(findfile('gulpfile.js', expand('%:p:h') . ';/'))
     call StartGulpServer()
   endif
 endfun
@@ -74,7 +73,6 @@ augroup GulpAutoDetect
   au!
   au BufRead * call GulpAutoDetect()
   au VimEnter * call GulpAutoDetect()
-  au VimLeave * call StopGulpServer()
 augroup END
 
 fun! ListGulpTasks(ArgLead, CmdLine, CursorPos)
@@ -82,10 +80,10 @@ fun! ListGulpTasks(ArgLead, CmdLine, CursorPos)
   if empty(gulpfile)
     return ""
   endif
-  let data = ch_sendexpr(s:gulp_handle, {'type': 'list-tasks', 'args': 'all', 'gulpfile': fnamemodify(gulpfile, ':p')})
+  let data = ch_sendexpr(s:ch_handle, {'type': 'list-tasks', 'args': 'all', 'gulpfile': fnamemodify(gulpfile, ':p')})
   return join(data["tasks"], "\n")
 endfun
 
 com! -bang -nargs=+ -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)
-com! GulpStatus :echo exists("s:gulp_job") && exists("s:gulp_handle") ? s:gulp_job . " [channel: " . ch_status(s:gulp_handle) . "]" : "gulp server not running"
+com! GulpStatus :echo exists("s:job") && exists("s:ch_handle") ? s:job . " [channel: " . ch_status(s:ch_handle) . "]" : "gulp server not running"
 com! -count=0 GulpLog :echo join(<count> == 0 ? s:lbuf : s:lbuf[-<count>:], "\n")
