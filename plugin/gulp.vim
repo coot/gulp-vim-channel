@@ -12,7 +12,7 @@ fun! GulpHandler(handle, msg)
   let msg = 'gulp: ' . data
   call add(s:lbuf, msg)
 
-  if mode() != "c" && type != "stdout" && !a:msg["silent"]
+  if mode() != "c" && type != "stdout" && !get(a:msg, "silent", 0)
       echomsg msg
   endif
 endfun

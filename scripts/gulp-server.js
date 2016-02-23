@@ -90,7 +90,7 @@ function logEvents(socket, data, gulpInst) {
     socket.write(JSON.stringify([
       0,
       {
-        silent: data.silent,
+        silent: Boolean(data.silent),
         type: 'task_start',
         data: 'Starting \'' + e.task + '\'...',
       }
@@ -100,7 +100,7 @@ function logEvents(socket, data, gulpInst) {
     socket.write(JSON.stringify([
       0,
       {
-        silent: data.silent,
+        silent: Boolean(data.silent),
         type: 'task_stop',
         data: 'Finished \'' + e.task + '\' after ' + prettyTime(e.hrDuration),
       }
