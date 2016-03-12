@@ -69,10 +69,12 @@ fun! ListGulpTasks(ArgLead, CmdLine, CursorPos)
   if empty(gulpfile)
     return ""
   endif
-  let data = ch_sendexpr(s:ch_handle, {'type': 'list-tasks', 'args': 'all', 'gulpfile': fnamemodify(gulpfile, ':p')})
+  let data = ch_evalexpr(s:ch_handle, {'type': 'list-tasks', 'args': 'all', 'gulpfile': fnamemodify(gulpfile, ':p')})
   return join(data["tasks"], "\n")
 endfun
 
 com! -bang -nargs=+ -complete=custom,ListGulpTasks Gulp :call Gulp(<q-bang>, <q-args>)
-com! GulpStatus :echo exists("s:job") && exists("s:ch_handle") ? s:job . " [channel: " . ch_status(s:ch_handle) . "]" : "gulp server not running"
 com! -count=0 GulpLog :echo join(<count> == 0 ? s:lbuf : s:lbuf[-<count>:], "\n")
+" why I need wait 100m?
+com! GulpRestart :call StopGulpServer()|sleep 100m|call StartGulpServer()
+com! GulpStatus :echo exists("s:job") && exists("s:ch_handle") ? s:job . " [channel: " . ch_status(s:ch_handle) . "]" : "gulp server not running"
