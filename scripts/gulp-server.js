@@ -2,12 +2,16 @@
 
 const argv = require('argv');
 const byline = require('byline');
+const fs = require('fs');
 const net = require('net');
 const spawn = require('child_process').spawn;
 const prettyTime = require('pretty-time');
 const uncolor = require('uncolor');
 const vm = require('vm');
 const path = require('path');
+const watch = require('node-watch');
+
+let logFile = null;
 
 // some task may use process.exit to exit (gulp-karma)
 process.exit = () => {};
@@ -60,15 +64,14 @@ function getGulp(gulpfile) {
 const gulpCache = new Map();
 
 function handleException(socket, err) {
-  console.error(err.message);
-  console.error(err.stack);
-  socket.end(JSON.stringify([0, {'data': err.toString(), 'type': 'error', 'silent': false}]));
+  if (logFile)
+    fs.appendFile(logFile, err.message + "\n" + err.stack + "\n");
 }
 
-function logEvents(socket, data, gulpInst) {
+function logEvents(socket, requestID, data, gulpInst) {
   gulpInst.on('err', (e) => {
     socket.write(JSON.stringify([
-      0,
+      requestID,
       {
         silent: false,
         type: 'err',
@@ -78,7 +81,7 @@ function logEvents(socket, data, gulpInst) {
   });
   gulpInst.on('task_err', (e) => {
     socket.write(JSON.stringify([
-      0,
+      requestID,
       {
         silent: false,
         type: 'task_err',
@@ -88,7 +91,7 @@ function logEvents(socket, data, gulpInst) {
   });
   gulpInst.on('task_start', (e) => {
     socket.write(JSON.stringify([
-      0,
+      requestID,
       {
         silent: Boolean(data.silent),
         type: 'task_start',
@@ -98,7 +101,7 @@ function logEvents(socket, data, gulpInst) {
   });
   gulpInst.on('task_stop', (e) => {
     socket.write(JSON.stringify([
-      0,
+      requestID,
       {
         silent: Boolean(data.silent),
         type: 'task_stop',
@@ -109,70 +112,87 @@ function logEvents(socket, data, gulpInst) {
 }
 
 // sniff on a writeable stream
-function sniff(writable, callback) {
-  var write = writable.write;
+const sniffQueue = [];
+
+function sniff(writable) {
+  let write = writable.write;
   writable.write = (string, encoding, fd) => {
     write.apply(process.stdout, arguments);
-    callback(string, encoding, fd);
+    sniffQueue.map((cb) => cb(string, encoding, fd))
   };
   return () => {writable.write = write;};
 }
 
-const server = net.createServer((socket) => {
-  // new connection
+function sniffio(type, socket, string, enc, fd) {
+  if (typeof string !== 'string')
+    return;
+  string.split(/\n/).forEach((chunk) => {
+    if (chunk.trim())
+      socket.write(JSON.stringify([
+        0,
+        {
+          silent: false,
+          type: type,
+          data: uncolor(chunk),
+        }
+      ]));
+  });
+};
 
-  let beQuiet = false;
-  function sniffio(type, string, enc, fd) {
-    if (beQuiet || typeof string !== 'string')
-      return;
-    string.split(/\n/).forEach((chunk) => {
-      if (chunk.trim())
-        socket.write(JSON.stringify([
-          0,
-          {
-            silent: false,
-            type: type,
-            data: uncolor(chunk),
-          }
-        ]));
-    });
-  };
-  sniff(process.stdout, sniffio.bind(null, 'stdout'));
-  sniff(process.stderr, sniffio.bind(null, 'stderr'));
+let socketID = -1;
+const logSockGf = new Map();;
+
+const server = net.createServer((socket) => {
+  socketID = socketID + 1;
+
+  // new connection
+  if (logFile) {
+    fs.appendFile(logFile, 'new client\n');
+    socket.on('end', () => fs.appendFile(logFile, 'client disconnected\n'));
+  }
+
+  sniffQueue.push.call(sniffQueue, sniffio.bind(null, 'stdout', socket), sniffio.bind(null, 'stderr', socket));
 
   socket.on('data', (msg) => {
     try {
-      let decoded = JSON.parse(msg.toString());
-      let data = decoded[1],
+      let decoded = JSON.parse(msg.toString()),
+          data = decoded[1],
           task = data.task,
           silent = Boolean(data.silent),
           requestID = decoded[0],
           gulpfile = data.gulpfile,
-          gulpInst = gulpCache.get(gulpfile);
+          cache = gulpCache.get(gulpfile),
+          gulpInst = cache ? cache.gulpInst : null;
       if (!gulpInst) {
         gulpInst = getGulp(gulpfile);
-        gulpCache.set(gulpfile, gulpInst);
+        let watchGf = watch(
+          gulpfile,
+          {persistent: false, recursive: false},
+          (filename) =>  {
+            gulpCache.delete(filename);
+            delete require.cache[filename];
+          }
+        );
+        gulpCache.set(gulpfile, {gulp: gulpInst, watch: watchGf});
       }
 
-      if (gulpInst._eventsCount === 0)
-        logEvents(socket, data, gulpInst);
+      if (!logSockGf.get(socketID + ":" + gulpfile)) {
+        // log events if the event handlers are not registered yet for this
+        // socket & gulp instance
+        logSockGf.set(socketID + ":" + gulpfile, true);
+        logEvents(socket, 0, data, gulpInst);
+      }
 
       // run the task
       if (data.type === 'start-tasks')
         gulpInst.start(data.args);
       else if (data.type === 'list-tasks') {
-        let tasks;
+        let tasks = Object.keys(gulpInst.tasks);
         if (data.args === 'running')
-          tasks = Object.keys(gulpInst.tasks)
-            .filter((task) => Boolean(gulpInst.tasks[task].running));
-        else
-          tasks = Object.keys(gulpInst.tasks);
+          tasks = tasks.filter((task) => Boolean(gulpInst.tasks[task].running));
         socket.write(JSON.stringify([
           requestID, {type: 'list-tasks', tasks: tasks}
         ]));
-        beQuiet = true;
-        console.log(tasks);
-        beQuiet = false;
       }
     } catch (err) {
       handleException(socket, err);
@@ -186,11 +206,16 @@ if (require.main === module) {
     'short': 'p',
     'type': 'string',
     'description': 'port to bind to',
+    'log-file': 'log file to use'
   });
   let args = argv.run(),
       port = parseInt(args.options.port || 3746);
+  logFile = args.options['log-file'] || null;
   server.listen(port, () => {
-      console.log('server running on localhost:' + port);
+      if (logFile)
+        fs.appendFile(logFile, "server running on localhost:" + port + "\n");
+      sniff(process.stdout);
+      sniff(process.stderr);
     });
 }
 
