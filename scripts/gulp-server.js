@@ -18,7 +18,7 @@ process.exit = () => {};
 
 function genPaths(list, dir) {
   list.push(path.join(dir, 'node_modules'));
-  let parentDir = path.parse(dir).dir;
+  const parentDir = path.parse(dir).dir;
   if (dir != parentDir)
     return genPaths(list, parentDir);
   else
@@ -42,13 +42,13 @@ function genPaths(list, dir) {
  * @returns gulp instance
  */
 function getGulp(gulpfile) {
-  let cwd = process.cwd(),
+  const cwd = process.cwd(),
     paths = module.paths,
     dirname = path.dirname(gulpfile);
   module.paths = genPaths([], dirname);
   process.chdir(dirname);
-  let script = new vm.Script(
-      "'use strict'; const gulp = require('gulp'); require(gulpfile); module.export = gulp;",
+  const script = new vm.Script(
+      "'use strict'; const gulp = require('gulp'); require(gulpfile); module.exports = gulp;",
       {filename: 'gulp-runner.js'}
     ),
     runner = script.runInNewContext({
@@ -115,7 +115,7 @@ function logEvents(socket, requestID, data, gulpInst) {
 const sniffQueue = [];
 
 function sniff(writable) {
-  let write = writable.write;
+  const write = writable.write;
   writable.write = (string, encoding, fd) => {
     write.apply(process.stdout, arguments);
     sniffQueue.map((cb) => cb(string, encoding, fd))
@@ -155,17 +155,16 @@ const server = net.createServer((socket) => {
 
   socket.on('data', (msg) => {
     try {
-      let decoded = JSON.parse(msg.toString()),
-          data = decoded[1],
-          task = data.task,
-          silent = Boolean(data.silent),
-          requestID = decoded[0],
-          gulpfile = data.gulpfile,
-          cache = gulpCache.get(gulpfile),
-          gulpInst = cache ? cache.gulpInst : null;
+      const decoded = JSON.parse(msg.toString()),
+        requestID = decoded[0],
+        data = decoded[1],
+        silent = Boolean(data.silent),
+        gulpfile = data.gulpfile,
+        cache = gulpCache.get(gulpfile);
+      let gulpInst = cache ? cache.gulpInst : null;
       if (!gulpInst) {
         gulpInst = getGulp(gulpfile);
-        let watchGf = watch(
+        const watchGf = watch(
           gulpfile,
           {persistent: false, recursive: false},
           (filename) =>  {
@@ -187,7 +186,7 @@ const server = net.createServer((socket) => {
       if (data.type === 'start-tasks')
         gulpInst.start(data.args);
       else if (data.type === 'list-tasks') {
-        let tasks = Object.keys(gulpInst.tasks);
+        const tasks = Object.keys(gulpInst.tasks);
         if (data.args === 'running')
           tasks = tasks.filter((task) => Boolean(gulpInst.tasks[task].running));
         socket.write(JSON.stringify([
@@ -208,8 +207,8 @@ if (require.main === module) {
     'description': 'port to bind to',
     'log-file': 'log file to use'
   });
-  let args = argv.run(),
-      port = parseInt(args.options.port || 3746);
+  const args = argv.run(),
+    port = parseInt(args.options.port || 3746);
   logFile = args.options['log-file'] || null;
   server.listen(port, () => {
       if (logFile)
