@@ -1,0 +1,34 @@
+	    Help For Gulp Vim Channel		    *gulp-vim-channel*
+
+
+Gulp vim channel provides a server that runs in a background which executes
+gulp tasks on demand.  The advantage over runnning gulp task on the command
+line is that the gulp is already instantiated and thus starting a new tasks is
+really fast.
+
+This plugin requires a very recent vim version which supports the *+channel*
+feature.
+
+You don't need to start the server, it will start automatically, if the
+current dir has a parent with a gulpfile.  There are a few commands to control
+the server (start, stop, restart) and one entry point to run tasks.
+
+						    *:Gulp*
+:Gulp {task} [, {task}, ...]
+    Start a new gulp {task}, you can also privde a list of tasks (separated by
+    white space).
+
+						    *:GulpStop*
+:GulpStop
+    Stop the server.
+
+						    *:GulpStart*
+:GulpStart
+    Start the server.  It is running on `localhost:3746`, note that it is not
+    secured i.e. any user on your system can send messages to it, and thus run
+    a gulp tasks on your behalf.
+
+						    *:GulpRestart*
+:GulpRestart
+    Stop and restart the server.  This is useful if you want to stop any tasks
+    that are watching for file changes.
