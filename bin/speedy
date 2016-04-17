@@ -12,16 +12,11 @@ argv.option({
   'short': 'p',
   'type': 'string',
   'description': 'port to bind to',
-  'log-file': 'log file to use'
 });
 
 const args = argv.run(),
   port = parseInt(args.options.port || 3746),
-  finished = new Map(),
   finRg = /^Finished '([^']+)'/;
-for(let task of args.targets) {
-  finished.set(task, false);
-}
 
 function findGulpfile(dirname) {
   const gulpfile = path.join(dirname, 'gulpfile.js');
@@ -38,10 +33,16 @@ let gulpfile;
 try {
   gulpfile = findGulpfile(process.cwd());
 } catch (err) {
+  console.log('gulpfile.js not found');
   process.exit(1);
 }
 
 function connect() {
+  const finished = new Map();
+  for(let task of args.targets) {
+    finished.set(task, false);
+  }
+
   const client = net.connect({port: port}, () => {
     client.write(JSON.stringify([
       0,
@@ -80,10 +81,10 @@ function connect() {
 let client = connect();
 client.on('error', (err) => {
   if (err.code === 'ECONNREFUSED') {
-    console.log('starting gulp-server');
+    console.log('starting gulp-server on port ' + port);
     const gsPath = path.normalize(path.join(__dirname, '../scripts/gulp-server.js'));
-    spawn('node', ['--harmony', gsPath, '--port', port], {detached: true});
-    setTimeout(connect, 100);
+    spawn('node', ['--harmony', gsPath, '--port='+port], {detached: true});
+    setTimeout(connect, 1000);
   }
 });
 
