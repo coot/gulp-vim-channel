@@ -249,6 +249,6 @@ if (require.main === module) {
   });
 }
 
-module.exports = {
-  getGulp: getGulp,
-};
+module.exports = server;
+module.exports.getGulp = getGulp;
+exports.sniff = sniff;
