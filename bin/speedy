@@ -4,6 +4,7 @@
 const argv = require('argv');
 const fs = require('fs');
 const net = require('net');
+const spawn = require('child_process').spawn;
 const path = require('path');
 
 argv.option({
@@ -15,7 +16,12 @@ argv.option({
 });
 
 const args = argv.run(),
-  port = parseInt(args.options.port || 3746);
+  port = parseInt(args.options.port || 3746),
+  finished = new Map(),
+  finRg = /^Finished '([^']+)'/;
+for(let task of args.targets) {
+  finished.set(task, false);
+}
 
 function findGulpfile(dirname) {
   const gulpfile = path.join(dirname, 'gulpfile.js');
@@ -35,33 +41,50 @@ try {
   process.exit(1);
 }
 
-const client = net.connect({port: port}, () => {
-  client.write(JSON.stringify([
-    0,
-    {
-      type: 'start-tasks',
-      args: args.targets,
-      silent: false,
-      gulpfile: gulpfile,
-    }
-  ]));
-});
+function connect() {
+  const client = net.connect({port: port}, () => {
+    client.write(JSON.stringify([
+      0,
+      {
+        type: 'start-tasks',
+        args: args.targets,
+        silent: false,
+        gulpfile: gulpfile,
+      }
+    ]));
+  });
 
-const finished = new Map();
-for(let task in args.targets) {
-  finished.set(task, false);
+  client.on('data', (msg) => {
+    let parsed;
+    try {
+      parsed  = JSON.parse(msg.toString()); 
+    } catch (err) {
+      console.error(err);
+      console.error(err.stack);
+    }
+    const data = parsed[1];
+    console.log(data.data);
+
+    let match = finRg.exec(data.data);
+    if (match && finished.has(match[1]))
+      finished.set(match[1], true);
+    for(let v of finished.values()) {
+      if (!v) return;
+    }
+    client.end();
+    process.exit(0);
+  });
+  return client;
 }
 
-client.on('data', (msg) => {
-  let parsed;
-  try {
-    parsed  = JSON.parse(msg.toString()); 
-  } catch (err) {
-    console.error(err);
-    console.error(err.stack);
+let client = connect();
+client.on('error', (err) => {
+  if (err.code === 'ECONNREFUSED') {
+    console.log('starting gulp-server');
+    const gsPath = path.normalize(path.join(__dirname, '../scripts/gulp-server.js'));
+    spawn('node', ['--harmony', gsPath], {detached: true});
+    setTimeout(connect, 100);
   }
-  const data = parsed[1];
-  console.log(data.data);
 });
 
 // vim: ft=javascript
