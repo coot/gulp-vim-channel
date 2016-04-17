@@ -82,7 +82,7 @@ client.on('error', (err) => {
   if (err.code === 'ECONNREFUSED') {
     console.log('starting gulp-server');
     const gsPath = path.normalize(path.join(__dirname, '../scripts/gulp-server.js'));
-    spawn('node', ['--harmony', gsPath], {detached: true});
+    spawn('node', ['--harmony', gsPath, '--port', port], {detached: true});
     setTimeout(connect, 100);
   }
 });
