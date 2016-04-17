@@ -63,3 +63,5 @@ client.on('data', (msg) => {
   const data = parsed[1];
   console.log(data.data);
 });
+
+// vim: ft=javascript
