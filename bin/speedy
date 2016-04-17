@@ -1,5 +1,5 @@
-'use strict'
 //!/usr/bin/env node --harmony
+'use strict'
 
 const argv = require('argv');
 const fs = require('fs');
