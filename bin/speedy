@@ -1,0 +1,65 @@
+'use strict'
+//!/usr/bin/env node --harmony
+
+const argv = require('argv');
+const fs = require('fs');
+const net = require('net');
+const path = require('path');
+
+argv.option({
+  'name': 'port',
+  'short': 'p',
+  'type': 'string',
+  'description': 'port to bind to',
+  'log-file': 'log file to use'
+});
+
+const args = argv.run(),
+  port = parseInt(args.options.port || 3746);
+
+function findGulpfile(dirname) {
+  const gulpfile = path.join(dirname, 'gulpfile.js');
+  if (fs.existsSync(gulpfile))
+    return gulpfile;
+  const parentPath = path.normalize(path.join(dirname, '..'));
+  if (parentPath === dirname)
+    throw Error('gulpfile not found');
+  else 
+    return findGulpfile(parentPath);
+};
+
+let gulpfile;
+try {
+  gulpfile = findGulpfile(process.cwd());
+} catch (err) {
+  process.exit(1);
+}
+
+const client = net.connect({port: port}, () => {
+  client.write(JSON.stringify([
+    0,
+    {
+      type: 'start-tasks',
+      args: args.targets,
+      silent: false,
+      gulpfile: gulpfile,
+    }
+  ]));
+});
+
+const finished = new Map();
+for(let task in args.targets) {
+  finished.set(task, false);
+}
+
+client.on('data', (msg) => {
+  let parsed;
+  try {
+    parsed  = JSON.parse(msg.toString()); 
+  } catch (err) {
+    console.error(err);
+    console.error(err.stack);
+  }
+  const data = parsed[1];
+  console.log(data.data);
+});
