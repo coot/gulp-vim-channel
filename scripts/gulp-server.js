@@ -11,7 +11,7 @@ const vm = require('vm');
 const path = require('path');
 const watch = require('node-watch');
 
-let logFile = "/tmp/gs.log";
+let logFile = null;
 
 // some task may use process.exit to exit (gulp-karma)
 process.exit = () => {};
