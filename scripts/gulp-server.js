@@ -79,7 +79,7 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
           type: 'err',
           data: e.message,
         }
-      ]));
+      ]) + "\n");
     },
     task_err: (e) => {
       socket.write(JSON.stringify([
@@ -89,7 +89,7 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
           type: 'task_err',
           data: '\'' + e.task + '\' error after ' + prettyTime(e.hrDuration),
         }
-      ]));
+      ]) + "\n");
     },
     task_start: (e) => {
       socket.write(JSON.stringify([
@@ -99,7 +99,7 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
           type: 'task_start',
           data: 'Starting \'' + e.task + '\'...',
         }
-      ]));
+      ]) + "\n");
     },
     task_stop: (e) => {
       socket.write(JSON.stringify([
@@ -109,7 +109,7 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
           type: 'task_stop',
           data: 'Finished \'' + e.task + '\' after ' + prettyTime(e.hrDuration),
         }
-      ]));
+      ]) + "\n");
     }
   }
 
@@ -139,8 +139,9 @@ function sniffio(type, socket, string, enc, fd) {
           silent: false,
           type: type,
           data: uncolor(chunk),
+          dataColor: chunk,
         }
-      ]));
+      ])) + "\n";
   });
 };
 
@@ -206,7 +207,7 @@ const server = net.createServer((socket) => {
           tasks = tasks.filter((task) => Boolean(gulpInst.tasks[task].running));
         socket.write(JSON.stringify([
           requestID, {type: 'list-tasks', tasks: tasks}
-        ]));
+        ]) + "\n");
       }
     } catch (err) {
       handleException(socket, err);

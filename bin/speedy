@@ -56,24 +56,27 @@ function connect() {
   });
 
   client.on('data', (msg) => {
-    let parsed;
-    try {
-      parsed  = JSON.parse(msg.toString()); 
-    } catch (err) {
-      console.error(err);
-      console.error(err.stack);
-    }
-    const data = parsed[1];
-    console.log(data.data);
+    msg.toString().split('\n').forEach((msg) => {
+      let parsed;
+      try {
+        parsed  = JSON.parse(msg); 
+      } catch (err) {
+        // console.log(msg);
+        // console.log(err);
+        return;
+      }
+      const data = parsed[1];
+      console.log(data.dataColor || data.data);
 
-    let match = finRg.exec(data.data);
-    if (match && finished.has(match[1]))
-      finished.set(match[1], true);
-    for(let v of finished.values()) {
-      if (!v) return;
-    }
-    client.end();
-    process.exit(0);
+      let match = finRg.exec(data.data);
+      if (match && finished.has(match[1]))
+        finished.set(match[1], true);
+      for(let v of finished.values()) {
+        if (!v) return;
+      }
+      client.end();
+      process.exit(0);
+    });
   });
   return client;
 }
