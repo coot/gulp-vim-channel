@@ -52,6 +52,9 @@ fun! s:Gulp(bang, tasks)
     echoerr "gulpfile not found"
     return
   endif
+  if !exists("s:ch_handle") || exists("s:ch_handle") && ch_status(s:ch_handle) != "open"
+    call s:GulpServerConnect()
+  endif
   let data = {'type': 'start-tasks', 'args': split(a:tasks, '[[:space:]]\+'), 'silent': !empty(a:bang), 'gulpfile': fnamemodify(gulpfile, ':p')}
   " {"callback": 0} - if callback is specified only the first message is
   " handled, if a message comes next with the same ID, it will be dropped.
@@ -88,8 +91,6 @@ endfun
 
 com! -bang -nargs=+ -complete=custom,ListGulpTasks Gulp :call s:Gulp(<q-bang>, <q-args>)
 com! -count=0 GulpLog :echo join(<count> == 0 ? s:lbuf : s:lbuf[-<count>:], "\n")
-" why I need wait 100m?
-com! GulpRestart :call s:StopGulpServer()|sleep 100m|call s:GulpServerConnect()
 com! GulpStart :call s:GulpServerConnect()
 com! GulpStop :call s:StopGulpServer()
 com! GulpStatus :echo exists("s:job") && exists("s:ch_handle") ? s:job . " [channel: " . ch_status(s:ch_handle) . "]" : "gulp server not running"
