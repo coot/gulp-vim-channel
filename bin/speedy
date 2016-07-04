@@ -14,6 +14,13 @@ argv.option({
   'description': 'port to bind to',
 });
 
+argv.option({
+  'name': 'log-file',
+  'short': '-l',
+  'type': 'string',
+  'description': 'log file to use',
+});
+
 const args = argv.run(),
   port = parseInt(args.options.port || 3746),
   finRg = /^Finished '([^']+)'/;
@@ -33,7 +40,7 @@ let gulpfile;
 try {
   gulpfile = findGulpfile(process.cwd());
 } catch (err) {
-  console.log('gulpfile.js not found');
+  console.error('gulpfile.js not found');
   process.exit(1);
 }
 
@@ -84,9 +91,13 @@ function connect() {
 let client = connect();
 client.on('error', (err) => {
   if (err.code === 'ECONNREFUSED') {
-    console.log('starting gulp-server on port ' + port);
-    const gsPath = path.normalize(path.join(__dirname, '../scripts/gulp-server.js'));
-    spawn('node', ['--harmony', gsPath, '--port='+port], {detached: true});
+    const gsPath = path.normalize(path.join(__dirname, '../scripts/gulp-server.js')),
+      options = ['--harmony', gsPath, '--port='+port],
+      logFile = args.options['log-file'];
+    if (logFile && typeof logFile === "string")
+      options.push(`--log-file=${logFile}`);
+    const pid = spawn('node', options, {detached: true}).pid;
+    console.info(`starting gulp-server (pid ${pid}) on port ${port}`);
     setTimeout(connect, 1000);
   }
 });
