@@ -11,6 +11,9 @@ const vm = require('vm');
 const path = require('path');
 const watch = require('node-watch');
 
+/** 
+ * use `--log-file=log-file-path` to set it 
+ */
 let logFile = null;
 
 // some task may use process.exit to exit (gulp-karma)
@@ -47,6 +50,8 @@ function getGulp(gulpfile) {
     dirname = path.dirname(gulpfile);
   module.paths = genPaths([], dirname);
   process.chdir(dirname);
+  if (logFile)
+    fs.appendFile(logFile, `chdir (getGulp): ${process.cwd()}`);
   const script = new vm.Script(
       "'use strict'; const gulp = require('gulp'); require(gulpfile); module.exports = gulp;",
       {filename: 'gulp-runner.js'}
@@ -90,6 +95,8 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
           data: '\'' + e.task + '\' error after ' + prettyTime(e.hrDuration),
         }
       ]) + "\n");
+      if (logFile)
+        fs.appendFile(logFile, 'task_err: ' + e.task + '\n');
     },
     task_start: (e) => {
       socket.write(JSON.stringify([
@@ -100,6 +107,8 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
           data: 'Starting \'' + e.task + '\'...',
         }
       ]) + "\n");
+      if (logFile)
+        fs.appendFile(logFile, 'task_start: ' + e.task + '\n');
     },
     task_stop: (e) => {
       socket.write(JSON.stringify([
@@ -110,6 +119,8 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
           data: 'Finished \'' + e.task + '\' after ' + prettyTime(e.hrDuration),
         }
       ]) + "\n");
+      if (logFile)
+        fs.appendFile(logFile, 'task_stop: ' + e.task + '\n');
     }
   }
 
@@ -118,11 +129,15 @@ function logEventHandlers(socket, socketId, requestID, data, gulpInst) {
 
 // sniff on a writeable stream
 const sniffQueue = [];
+if (logFile)
+  sniffQueue.push(
+    (string, env, fd) => fs.appendFile(logFile, 'sniff: ' + string.toString())
+  );
 
 function sniff(writable) {
   const write = writable.write;
   writable.write = (string, encoding, fd) => {
-    write.apply(writable, [string, encoding, fd]);
+    // write.call(writable, [string, encoding, fd]);
     sniffQueue.map((cb) => cb(string, encoding, fd))
   };
   return () => {writable.write = write;};
@@ -132,7 +147,7 @@ function sniffio(type, socket, string, enc, fd) {
   if (typeof string !== 'string')
     return;
   string.split(/\n/).forEach((chunk) => {
-    if (chunk.trim())
+    if (chunk.trim()) {
       socket.write(JSON.stringify([
         0,
         {
@@ -142,6 +157,9 @@ function sniffio(type, socket, string, enc, fd) {
           dataColor: chunk,
         }
       ])) + "\n";
+      if (logFile)
+        fs.appendFile(logFile, 'chunk: ' + uncolor(chunk) + '\n');
+    }
   });
 };
 
@@ -170,7 +188,16 @@ const server = net.createServer((socket) => {
         data = decoded[1],
         silent = Boolean(data.silent),
         gulpfile = data.gulpfile,
-        cache = gulpCache.get(gulpfile);
+        cache = gulpCache.get(gulpfile),
+        cwd = process.cwd();
+      // TODO: Change the directory to where the current gulp file is located,
+      // otherwise a gulp task that reads (or redirects to) files using relative path
+      // will not really run.  But if we do that runing two gulpfiles does not
+      // work (by the same reason, unless one is using absolut path, e.g.
+      // `path.join(__dirname, 'relative_path')` in the gulpfile.
+      process.chdir(path.dirname(gulpfile));
+      if (logFile)
+        fs.appendFile(logFile, `chdir (on data): ${process.cwd()}\n`)
       let gulpInst = cache ? cache.gulpInst : null;
       if (!gulpInst) {
         gulpInst = getGulp(gulpfile);
@@ -237,7 +264,12 @@ if (require.main === module) {
     'short': 'p',
     'type': 'string',
     'description': 'port to bind to',
-    'log-file': 'log file to use'
+  });
+  argv.option({
+    'name': 'log-file',
+    'short': '-l',
+    'type': 'string',
+    'description': 'log file to use',
   });
   const args = argv.run(),
     port = parseInt(args.options.port || 3746);
