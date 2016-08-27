@@ -1,13 +1,14 @@
 {
-  "name": "gulp-server",
+  "name": "gulp-speedy",
+  "keywords": "gulp cli",
   "version": "1.0.0",
-  "description": "gulp server which can run gulp commands",
+  "description": "client and a server which can run gulp commands",
   "main": "scripts/gulp-server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Marcin Szamotulski <coot@riseup.net>",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "argv": "0.0.2",
     "byline": "^4.2.1",
