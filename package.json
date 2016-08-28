@@ -1,7 +1,7 @@
 {
   "name": "gulp-speedy",
   "keywords": ["gulp", "cli"],
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "client and a server which can run gulp commands much quicker than gulp itself",
   "main": "scripts/gulp-server.js",
   "bin": {
