@@ -6,19 +6,40 @@ const fs = require('fs');
 const net = require('net');
 const spawn = require('child_process').spawn;
 const path = require('path');
+const ps = require('ps-node');
+
+const SERVER_PID_FILE = path.join(__dirname, '..', 'server.pid');
 
 argv.option({
-  'name': 'port',
-  'short': 'p',
-  'type': 'string',
-  'description': 'port to bind to',
+  name: 'port',
+  short: 'p',
+  type: 'string',
+  description: 'port to bind to',
 });
 
 argv.option({
-  'name': 'log-file',
-  'short': '-l',
-  'type': 'string',
-  'description': 'log file to use',
+  name: 'log-file',
+  short: '-l',
+  type: 'string',
+  description: 'log file to use',
+});
+
+argv.option({
+  name: 'start',
+  type: 'boolean',
+  description: 'start gulp server',
+});
+
+argv.option({
+  name: 'stop',
+  type: 'boolean',
+  description: 'stop gulp server',
+});
+
+argv.option({
+  name: 'restart',
+  type: 'boolean',
+  description: 'restart gulp server',
 });
 
 const args = argv.run(),
@@ -36,15 +57,7 @@ function findGulpfile(dirname) {
     return findGulpfile(parentPath);
 };
 
-let gulpfile;
-try {
-  gulpfile = findGulpfile(process.cwd());
-} catch (err) {
-  console.error('gulpfile.js not found');
-  process.exit(1);
-}
-
-function connect() {
+function connect(port, gulpfile) {
   const finished = new Map();
   for(let task of args.targets) {
     finished.set(task, false);
@@ -86,20 +99,66 @@ function connect() {
     });
   });
   return client;
-}
+};
 
-let client = connect();
-client.on('error', (err) => {
-  if (err.code === 'ECONNREFUSED') {
-    const gsPath = path.normalize(path.join(__dirname, '../scripts/gulp-server.js')),
-      options = ['--harmony', gsPath, '--port='+port],
-      logFile = args.options['log-file'];
-    if (logFile && typeof logFile === "string")
-      options.push(`--log-file=${logFile}`);
-    const pid = spawn('node', options, {detached: true}).pid;
-    console.info(`starting gulp-server (pid ${pid}) on port ${port}`);
-    setTimeout(connect, 1000);
+function stopServer() {
+  if (fs.existsSync(SERVER_PID_FILE)) {
+    const pid = fs.readFileSync(SERVER_PID_FILE)
+      .toString();
+    ps.kill(pid);
+    fs.unlinkSync(SERVER_PID_FILE);
   }
-});
+};
+
+function startServer(port) {
+  const gsPath = path.normalize(path.join(__dirname, '../scripts/gulp-server.js')),
+    options = ['--harmony', gsPath, '--port='+port],
+    logFile = args.options['log-file'];
+  if (logFile && typeof logFile === "string")
+    options.push(`--log-file=${logFile}`);
+  const pid = spawn('node', options, {detached: true}).pid;
+  console.info(`starting gulp-server (pid ${pid}) on port ${port}`);
+
+  if (fs.existsSync(SERVER_PID_FILE))
+    fs.unlinkSync(SERVER_PID_FILE);
+  fs.writeFileSync(SERVER_PID_FILE, pid)
+};
+
+if (args.options.start || args.options.stop || args.options.restart) {
+  if (args.options.start && args.options.stop
+      || args.options.start && args.options.restart
+      || args.options.stop && args.options.restart) {
+    console.info('only one of the switches is allowed:  --start, --stop, --restart')
+    process.exit(1);
+  }
+
+  if (args.options.stop) {
+    stopServer();
+  } else if (args.options.start) {
+    if (fs.existsSync(SERVER_PID_FILE))
+      stopServer();
+    startServer(port);
+  } else if (args.options.restart) {
+    stopServer();
+    startServer(port);
+  }
+  process.exit(0);
+} else {
+  let gulpfile;
+  try {
+    gulpfile = findGulpfile(process.cwd());
+  } catch (err) {
+    console.error('gulpfile.js not found');
+    process.exit(1);
+  }
+
+  let client = connect(port, gulpfile);
+  client.on('error', (err) => {
+    if (err.code === 'ECONNREFUSED') {
+      startServer(port);
+      setTimeout(connect, 1000, port, gulpfile);
+    }
+  });
+}
 
 // vim: ft=javascript

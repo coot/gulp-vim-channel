@@ -1,20 +1,23 @@
 {
   "name": "gulp-speedy",
-  "keywords": ["gulp", "cli"],
-  "version": "1.0.1",
+  "keywords": [
+    "gulp",
+    "cli"
+  ],
+  "version": "1.0.2",
   "description": "client and a server which can run gulp commands much quicker than gulp itself",
   "main": "scripts/gulp-server.js",
   "bin": {
-      "speedy": "bin/speedy"
+    "speedy": "bin/speedy"
   },
   "homepage": "https://github.com/coot/speedy#readme",
   "installable": true,
   "repository": {
-      "type": "git",
-      "url": "git://github.com/coot/speedy.git"
+    "type": "git",
+    "url": "git://github.com/coot/speedy.git"
   },
   "bugs": {
-      "url": "https://github.com/coot/speedy/issues"
+    "url": "https://github.com/coot/speedy/issues"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -28,6 +31,7 @@
     "node-watch": "^0.3.5",
     "path": "^0.12.7",
     "pretty-time": "^0.2.0",
+    "ps-node": "^0.1.2",
     "uncolor": "^0.4.0"
   }
 }
